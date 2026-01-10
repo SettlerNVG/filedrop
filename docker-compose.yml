@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  relay:
+    build:
+      context: .
+      target: relay
+    ports:
+      - "9000:9000"
+    restart: unless-stopped
+    container_name: filedrop-relay
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

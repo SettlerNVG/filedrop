@@ -1,0 +1,20 @@
+# Binaries
+bin/
+dist/
+*.exe
+
+# Go
+go.work
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+api_keys.txt
+.filedrop_progress_*
