@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"strings"
 	"sync"
@@ -85,6 +86,36 @@ func getLocalIPs() []string {
 	return ips
 }
 
+func getPublicIP() string {
+	// Try to get public IP from external service
+	client := &http.Client{Timeout: 3 * time.Second}
+	
+	services := []string{
+		"https://api.ipify.org",
+		"https://ifconfig.me/ip",
+		"https://icanhazip.com",
+	}
+	
+	for _, url := range services {
+		resp, err := client.Get(url)
+		if err != nil {
+			continue
+		}
+		defer resp.Body.Close()
+		
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			continue
+		}
+		
+		ip := strings.TrimSpace(string(body))
+		if net.ParseIP(ip) != nil {
+			return ip
+		}
+	}
+	return ""
+}
+
 func (r *RelayServer) Run(addr string) error {
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -95,23 +126,37 @@ func (r *RelayServer) Run(addr string) error {
 	port := strings.TrimPrefix(addr, ":")
 	
 	fmt.Println()
-	fmt.Println("╔════════════════════════════════════════════════════════════╗")
-	fmt.Println("║                    🚀 FileDrop Relay                       ║")
-	fmt.Println("╠════════════════════════════════════════════════════════════╣")
-	fmt.Printf("║  Port: %-52s║\n", port)
-	fmt.Println("╠════════════════════════════════════════════════════════════╣")
-	fmt.Println("║  Connect using:                                            ║")
-	fmt.Printf("║    Local:    filedrop -relay localhost:%s              ║\n", port)
+	fmt.Println("╔════════════════════════════════════════════════════════════════╗")
+	fmt.Println("║                      🚀 FileDrop Relay                         ║")
+	fmt.Println("╠════════════════════════════════════════════════════════════════╣")
+	fmt.Printf("║  Port: %-56s║\n", port)
+	fmt.Println("╠════════════════════════════════════════════════════════════════╣")
+	
+	// Public IP for remote access
+	publicIP := getPublicIP()
+	if publicIP != "" {
+		fmt.Println("║  🌍 PUBLIC ACCESS (share this with friends):                   ║")
+		connStr := fmt.Sprintf("filedrop -relay %s:%s send <file>", publicIP, port)
+		fmt.Printf("║     %-58s║\n", connStr)
+		fmt.Println("║                                                                ║")
+	}
+	
+	fmt.Println("║  🏠 LOCAL ACCESS:                                               ║")
+	fmt.Printf("║     filedrop -relay localhost:%s send <file>                  ║\n", port)
 	
 	ips := getLocalIPs()
 	for _, ip := range ips {
-		connStr := fmt.Sprintf("filedrop -relay %s:%s", ip, port)
-		fmt.Printf("║    Network:  %-47s║\n", connStr)
+		connStr := fmt.Sprintf("filedrop -relay %s:%s send <file>", ip, port)
+		fmt.Printf("║     %-58s║\n", connStr)
 	}
 	
-	fmt.Println("╠════════════════════════════════════════════════════════════╣")
-	fmt.Println("║  TUI mode:   filedrop-tui -relay <address>                 ║")
-	fmt.Println("╚════════════════════════════════════════════════════════════╝")
+	fmt.Println("╠════════════════════════════════════════════════════════════════╣")
+	fmt.Println("║  📱 TUI mode: filedrop-tui -relay <address>                    ║")
+	fmt.Println("╠════════════════════════════════════════════════════════════════╣")
+	if publicIP != "" {
+		fmt.Println("║  ⚠️  Make sure port " + port + " is open in your firewall/router!       ║")
+	}
+	fmt.Println("╚════════════════════════════════════════════════════════════════╝")
 	fmt.Println()
 
 	log.Printf("Relay server started on %s", addr)

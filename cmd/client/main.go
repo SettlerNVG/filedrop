@@ -282,29 +282,8 @@ func receiveSimple(relayAddr, code, outputDir string) error {
 	return err
 }
 
-// Default public relay server
-const DefaultRelay = "localhost:9000"
-
-// Public relay servers (will try in order)
-var PublicRelays = []string{
-	"filedrop.fly.dev:9000",      // Fly.io (если задеплоишь)
-	"localhost:9000",              // Local fallback
-}
-
-// findWorkingRelay tries to connect to available relays
-func findWorkingRelay() string {
-	for _, relay := range PublicRelays {
-		conn, err := net.DialTimeout("tcp", relay, 2*time.Second)
-		if err == nil {
-			conn.Close()
-			return relay
-		}
-	}
-	return DefaultRelay
-}
-
 func main() {
-	relayAddr := flag.String("relay", "", "Relay server address (auto-detect if empty)")
+	relayAddr := flag.String("relay", "", "Relay server address (required)")
 	outputDir := flag.String("output", ".", "Output directory")
 	password := flag.String("password", "", "Encryption password")
 	key := flag.String("key", "", "Encryption key (for receive)")
@@ -312,24 +291,16 @@ func main() {
 	simple := flag.Bool("simple", true, "Simple mode (single file, no encryption)")
 	flag.Parse()
 
-	// Auto-detect relay if not specified
-	relay := *relayAddr
-	if relay == "" {
-		fmt.Println("🔍 Finding available relay server...")
-		relay = findWorkingRelay()
-		fmt.Printf("📡 Using relay: %s\n", relay)
-	}
-
 	args := flag.Args()
 	if len(args) < 1 {
 		fmt.Println(`FileDrop - P2P File Transfer
 
 Usage:
-  filedrop send <file/folder>     Send files
-  filedrop receive <code>         Receive files
+  filedrop -relay <server:port> send <file>      Send files
+  filedrop -relay <server:port> receive <code>   Receive files
 
 Flags:
-  -relay string      Relay server (auto-detect if empty)
+  -relay string      Relay server address (required)
   -output string     Output directory (default ".")
   -password string   Encryption password
   -key string        Encryption key (for receive)
@@ -337,9 +308,15 @@ Flags:
   -simple            Simple mode - single file, no encryption (default)
 
 Examples:
-  filedrop send myfile.zip
-  filedrop receive ABC123
-  filedrop -relay myserver:9000 send myfile.zip`)
+  filedrop -relay 192.168.1.100:9000 send myfile.zip
+  filedrop -relay myserver.com:9000 receive ABC123`)
+		os.Exit(1)
+	}
+
+	relay := *relayAddr
+	if relay == "" {
+		fmt.Println("❌ Error: -relay flag is required")
+		fmt.Println("Example: filedrop -relay 192.168.1.100:9000 send myfile.zip")
 		os.Exit(1)
 	}
 
@@ -347,7 +324,7 @@ Examples:
 	switch args[0] {
 	case "send":
 		if len(args) < 2 {
-			fmt.Println("Usage: filedrop send <file/folder>")
+			fmt.Println("Usage: filedrop -relay <server:port> send <file/folder>")
 			os.Exit(1)
 		}
 		if *simple {
@@ -358,7 +335,7 @@ Examples:
 
 	case "receive", "recv":
 		if len(args) < 2 {
-			fmt.Println("Usage: filedrop receive <code>")
+			fmt.Println("Usage: filedrop -relay <server:port> receive <code>")
 			os.Exit(1)
 		}
 		if *simple {
