@@ -69,6 +69,22 @@ func NewRelayServer(requireAuth bool) *RelayServer {
 	}
 }
 
+func getLocalIPs() []string {
+	var ips []string
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return ips
+	}
+	for _, addr := range addrs {
+		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				ips = append(ips, ipnet.IP.String())
+			}
+		}
+	}
+	return ips
+}
+
 func (r *RelayServer) Run(addr string) error {
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -76,7 +92,29 @@ func (r *RelayServer) Run(addr string) error {
 	}
 	defer listener.Close()
 
-	log.Printf("🚀 Relay server listening on %s", addr)
+	port := strings.TrimPrefix(addr, ":")
+	
+	fmt.Println()
+	fmt.Println("╔════════════════════════════════════════════════════════════╗")
+	fmt.Println("║                    🚀 FileDrop Relay                       ║")
+	fmt.Println("╠════════════════════════════════════════════════════════════╣")
+	fmt.Printf("║  Port: %-52s║\n", port)
+	fmt.Println("╠════════════════════════════════════════════════════════════╣")
+	fmt.Println("║  Connect using:                                            ║")
+	fmt.Printf("║    Local:    filedrop -relay localhost:%s              ║\n", port)
+	
+	ips := getLocalIPs()
+	for _, ip := range ips {
+		connStr := fmt.Sprintf("filedrop -relay %s:%s", ip, port)
+		fmt.Printf("║    Network:  %-47s║\n", connStr)
+	}
+	
+	fmt.Println("╠════════════════════════════════════════════════════════════╣")
+	fmt.Println("║  TUI mode:   filedrop-tui -relay <address>                 ║")
+	fmt.Println("╚════════════════════════════════════════════════════════════╝")
+	fmt.Println()
+
+	log.Printf("Relay server started on %s", addr)
 	if r.requireAuth {
 		log.Println("🔐 Authentication required")
 	}

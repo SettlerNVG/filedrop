@@ -669,8 +669,11 @@ func (m model) acceptTransfer(fromUserID string) tea.Cmd {
 	}
 }
 
+// Default public relay server
+const DefaultRelay = "relay.filedrop.dev:9000"
+
 func main() {
-	relayAddr := flag.String("relay", "localhost:9000", "Relay server address")
+	relayAddr := flag.String("relay", DefaultRelay, "Relay server address")
 	username := flag.String("name", "", "Your display name")
 	flag.Parse()
 

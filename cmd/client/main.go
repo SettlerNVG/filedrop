@@ -282,8 +282,11 @@ func receiveSimple(relayAddr, code, outputDir string) error {
 	return err
 }
 
+// Default public relay server
+const DefaultRelay = "relay.filedrop.dev:9000"
+
 func main() {
-	relayAddr := flag.String("relay", "localhost:9000", "Relay server address")
+	relayAddr := flag.String("relay", DefaultRelay, "Relay server address")
 	outputDir := flag.String("output", ".", "Output directory")
 	password := flag.String("password", "", "Encryption password")
 	key := flag.String("key", "", "Encryption key (for receive)")
@@ -300,7 +303,7 @@ Usage:
   filedrop receive <code>         Receive files
 
 Flags:
-  -relay string      Relay server (default "localhost:9000")
+  -relay string      Relay server (default "` + DefaultRelay + `")
   -output string     Output directory (default ".")
   -password string   Encryption password
   -key string        Encryption key (for receive)
@@ -310,8 +313,8 @@ Flags:
 Examples:
   filedrop send myfile.zip
   filedrop receive ABC123
-  filedrop -simple=false -password=secret send ./folder
-  filedrop -simple=false -password=secret receive ABC123`)
+  filedrop -relay localhost:9000 send myfile.zip
+  filedrop -simple=false -password=secret send ./folder`)
 		os.Exit(1)
 	}
 

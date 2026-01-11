@@ -6,7 +6,6 @@ set -e
 
 REPO="SettlerNVG/filedrop"
 INSTALL_DIR="/usr/local/bin"
-BINARY_NAME="filedrop"
 
 # Colors
 RED='\033[0;31m'
@@ -45,13 +44,15 @@ esac
 case "$OS" in
     linux)
         PLATFORM="linux"
+        EXT=""
         ;;
     darwin)
         PLATFORM="darwin"
+        EXT=""
         ;;
     mingw*|msys*|cygwin*)
         PLATFORM="windows"
-        BINARY_NAME="filedrop.exe"
+        EXT=".exe"
         ;;
     *)
         echo -e "${RED}Unsupported OS: $OS${NC}"
@@ -59,55 +60,82 @@ case "$OS" in
         ;;
 esac
 
-BINARY="filedrop-${PLATFORM}-${ARCH}"
-if [ "$PLATFORM" = "windows" ]; then
-    BINARY="${BINARY}.exe"
-fi
-
 echo -e "Detected: ${YELLOW}${PLATFORM}/${ARCH}${NC}"
-
-# Get latest release URL
-RELEASE_URL="https://github.com/${REPO}/releases/latest/download/${BINARY}"
-
-echo -e "Downloading from: ${YELLOW}${RELEASE_URL}${NC}"
 
 # Create temp directory
 TMP_DIR=$(mktemp -d)
 trap "rm -rf $TMP_DIR" EXIT
 
-# Download binary
-if command -v curl &> /dev/null; then
-    curl -fsSL "$RELEASE_URL" -o "$TMP_DIR/$BINARY_NAME"
-elif command -v wget &> /dev/null; then
-    wget -q "$RELEASE_URL" -O "$TMP_DIR/$BINARY_NAME"
+download_binary() {
+    local name=$1
+    local output=$2
+    local url="https://github.com/${REPO}/releases/latest/download/${name}"
+    
+    echo -e "Downloading: ${YELLOW}${name}${NC}"
+    
+    if command -v curl &> /dev/null; then
+        curl -fsSL "$url" -o "$TMP_DIR/$output" 2>/dev/null || return 1
+    elif command -v wget &> /dev/null; then
+        wget -q "$url" -O "$TMP_DIR/$output" 2>/dev/null || return 1
+    else
+        echo -e "${RED}Error: curl or wget required${NC}"
+        exit 1
+    fi
+    
+    chmod +x "$TMP_DIR/$output"
+    return 0
+}
+
+install_binary() {
+    local name=$1
+    if [ -w "$INSTALL_DIR" ]; then
+        mv "$TMP_DIR/$name" "$INSTALL_DIR/$name"
+    else
+        sudo mv "$TMP_DIR/$name" "$INSTALL_DIR/$name"
+    fi
+}
+
+# Download CLI client
+CLI_BINARY="filedrop-${PLATFORM}-${ARCH}${EXT}"
+CLI_NAME="filedrop${EXT}"
+if download_binary "$CLI_BINARY" "$CLI_NAME"; then
+    echo -e "${GREEN}✓${NC} CLI client downloaded"
 else
-    echo -e "${RED}Error: curl or wget required${NC}"
-    exit 1
+    echo -e "${RED}✗${NC} Failed to download CLI client"
 fi
 
-# Make executable
-chmod +x "$TMP_DIR/$BINARY_NAME"
+# Download TUI client
+TUI_BINARY="filedrop-tui-${PLATFORM}-${ARCH}${EXT}"
+TUI_NAME="filedrop-tui${EXT}"
+if download_binary "$TUI_BINARY" "$TUI_NAME"; then
+    echo -e "${GREEN}✓${NC} TUI client downloaded"
+else
+    echo -e "${YELLOW}!${NC} TUI client not available (optional)"
+fi
 
 # Install
-if [ -w "$INSTALL_DIR" ]; then
-    mv "$TMP_DIR/$BINARY_NAME" "$INSTALL_DIR/$BINARY_NAME"
-else
+echo ""
+if [ ! -w "$INSTALL_DIR" ]; then
     echo -e "${YELLOW}Need sudo to install to $INSTALL_DIR${NC}"
-    sudo mv "$TMP_DIR/$BINARY_NAME" "$INSTALL_DIR/$BINARY_NAME"
 fi
 
+[ -f "$TMP_DIR/$CLI_NAME" ] && install_binary "$CLI_NAME"
+[ -f "$TMP_DIR/$TUI_NAME" ] && install_binary "$TUI_NAME"
+
 # Verify installation
-if command -v filedrop &> /dev/null; then
-    echo ""
-    echo -e "${GREEN}✅ FileDrop installed successfully!${NC}"
-    echo ""
-    echo "Usage:"
-    echo "  filedrop send <file>      # Send a file"
-    echo "  filedrop receive <code>   # Receive a file"
-    echo ""
-    echo "Example:"
-    echo "  filedrop -relay your-server:9000 send myfile.zip"
-else
-    echo -e "${RED}Installation failed${NC}"
-    exit 1
-fi
+echo ""
+echo -e "${GREEN}✅ FileDrop installed successfully!${NC}"
+echo ""
+echo "Commands:"
+echo ""
+echo -e "  ${YELLOW}filedrop${NC} - CLI client (quick file transfer by code)"
+echo "    filedrop send <file>        # Send a file, get code"
+echo "    filedrop receive <code>     # Receive by code"
+echo ""
+echo -e "  ${YELLOW}filedrop-tui${NC} - Interactive TUI (see online users)"
+echo "    filedrop-tui                # Launch interactive mode"
+echo ""
+echo "Examples:"
+echo "  filedrop -relay server:9000 send myfile.zip"
+echo "  filedrop-tui -relay server:9000"
+echo ""
