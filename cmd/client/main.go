@@ -283,16 +283,42 @@ func receiveSimple(relayAddr, code, outputDir string) error {
 }
 
 // Default public relay server
-const DefaultRelay = "relay.filedrop.dev:9000"
+const DefaultRelay = "localhost:9000"
+
+// Public relay servers (will try in order)
+var PublicRelays = []string{
+	"filedrop.fly.dev:9000",      // Fly.io (если задеплоишь)
+	"localhost:9000",              // Local fallback
+}
+
+// findWorkingRelay tries to connect to available relays
+func findWorkingRelay() string {
+	for _, relay := range PublicRelays {
+		conn, err := net.DialTimeout("tcp", relay, 2*time.Second)
+		if err == nil {
+			conn.Close()
+			return relay
+		}
+	}
+	return DefaultRelay
+}
 
 func main() {
-	relayAddr := flag.String("relay", DefaultRelay, "Relay server address")
+	relayAddr := flag.String("relay", "", "Relay server address (auto-detect if empty)")
 	outputDir := flag.String("output", ".", "Output directory")
 	password := flag.String("password", "", "Encryption password")
 	key := flag.String("key", "", "Encryption key (for receive)")
 	compress := flag.Bool("compress", false, "Enable compression")
 	simple := flag.Bool("simple", true, "Simple mode (single file, no encryption)")
 	flag.Parse()
+
+	// Auto-detect relay if not specified
+	relay := *relayAddr
+	if relay == "" {
+		fmt.Println("🔍 Finding available relay server...")
+		relay = findWorkingRelay()
+		fmt.Printf("📡 Using relay: %s\n", relay)
+	}
 
 	args := flag.Args()
 	if len(args) < 1 {
@@ -303,7 +329,7 @@ Usage:
   filedrop receive <code>         Receive files
 
 Flags:
-  -relay string      Relay server (default "` + DefaultRelay + `")
+  -relay string      Relay server (auto-detect if empty)
   -output string     Output directory (default ".")
   -password string   Encryption password
   -key string        Encryption key (for receive)
@@ -313,8 +339,7 @@ Flags:
 Examples:
   filedrop send myfile.zip
   filedrop receive ABC123
-  filedrop -relay localhost:9000 send myfile.zip
-  filedrop -simple=false -password=secret send ./folder`)
+  filedrop -relay myserver:9000 send myfile.zip`)
 		os.Exit(1)
 	}
 
@@ -326,9 +351,9 @@ Examples:
 			os.Exit(1)
 		}
 		if *simple {
-			err = sendSimple(*relayAddr, args[1])
+			err = sendSimple(relay, args[1])
 		} else {
-			err = sendFiles(*relayAddr, args[1:], *password, *compress)
+			err = sendFiles(relay, args[1:], *password, *compress)
 		}
 
 	case "receive", "recv":
@@ -337,9 +362,9 @@ Examples:
 			os.Exit(1)
 		}
 		if *simple {
-			err = receiveSimple(*relayAddr, args[1], *outputDir)
+			err = receiveSimple(relay, args[1], *outputDir)
 		} else {
-			err = receiveFiles(*relayAddr, args[1], *outputDir, *password, *key)
+			err = receiveFiles(relay, args[1], *outputDir, *password, *key)
 		}
 
 	default:

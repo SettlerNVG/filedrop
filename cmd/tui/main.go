@@ -669,15 +669,40 @@ func (m model) acceptTransfer(fromUserID string) tea.Cmd {
 	}
 }
 
-// Default public relay server
-const DefaultRelay = "relay.filedrop.dev:9000"
+// Default relay server
+const DefaultRelay = "localhost:9000"
+
+// Public relay servers
+var PublicRelays = []string{
+	"filedrop.fly.dev:9000",
+	"localhost:9000",
+}
+
+func findWorkingRelay() string {
+	for _, relay := range PublicRelays {
+		conn, err := net.DialTimeout("tcp", relay, 2*time.Second)
+		if err == nil {
+			conn.Close()
+			return relay
+		}
+	}
+	return DefaultRelay
+}
 
 func main() {
-	relayAddr := flag.String("relay", DefaultRelay, "Relay server address")
+	relayAddr := flag.String("relay", "", "Relay server address (auto-detect if empty)")
 	username := flag.String("name", "", "Your display name")
 	flag.Parse()
 
-	p := tea.NewProgram(initialModel(*relayAddr, *username), tea.WithAltScreen())
+	relay := *relayAddr
+	if relay == "" {
+		fmt.Println("🔍 Finding available relay server...")
+		relay = findWorkingRelay()
+		fmt.Printf("📡 Using relay: %s\n", relay)
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	p := tea.NewProgram(initialModel(relay, *username), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
