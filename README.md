@@ -18,27 +18,18 @@ curl -fsSL https://raw.githubusercontent.com/SettlerNVG/filedrop/main/install.sh
 - ✅ Защита паролем или автогенерация ключа
 - ✅ Сжатие данных (gzip)
 - ✅ Докачка при обрыве соединения
-- ✅ Аутентификация на relay (опционально)
 - ✅ Rate limiting
 - ✅ Прогресс-бар со скоростью
 - ✅ **TUI интерфейс** — видеть онлайн пользователей и передавать файлы напрямую
 
 ## Быстрый старт
 
-### 1. Запуск relay-сервера
+По умолчанию клиент подключается к публичному relay-серверу `5.18.196.229:9000`.
+
+### TUI режим (рекомендуется)
 
 ```bash
-# Docker
-docker-compose up -d
-
-# Или локально
-make run-relay
-```
-
-### 2. TUI режим (рекомендуется)
-
-```bash
-filedrop-tui -relay your-server:9000
+filedrop-tui
 ```
 
 В TUI вы можете:
@@ -46,18 +37,35 @@ filedrop-tui -relay your-server:9000
 - Выбрать пользователя и отправить ему файл
 - Принять входящие передачи
 
-### 3. CLI режим — Отправка файла
+### CLI режим — Отправка файла
 
 ```bash
-filedrop -relay your-server:9000 send myfile.zip
+filedrop send myfile.zip
 ```
 
 Получишь код, например: `A1B2C3`
 
-### 4. CLI режим — Получение файла
+### CLI режим — Получение файла
 
 ```bash
-filedrop -relay your-server:9000 receive A1B2C3
+filedrop receive A1B2C3
+```
+
+## Использование своего relay
+
+Можно указать свой relay-сервер:
+
+```bash
+# Через флаг
+filedrop -relay myserver:9000 send file.zip
+filedrop-tui -relay myserver:9000
+
+# Через переменную окружения
+export FILEDROP_RELAY=myserver:9000
+filedrop send file.zip
+
+# Через конфиг файл
+echo "myserver:9000" > ~/.filedrop/relay
 ```
 
 ## Расширенное использование
@@ -82,20 +90,27 @@ filedrop -simple=false -compress send ./my-folder
 
 | Флаг | По умолчанию | Описание |
 |------|--------------|----------|
-| `-relay` | `localhost:9000` | Адрес relay-сервера |
+| `-relay` | `5.18.196.229:9000` | Адрес relay-сервера |
 | `-output` | `.` | Папка для сохранения |
 | `-password` | - | Пароль шифрования |
-| `-key` | - | Ключ шифрования (при получении) |
 | `-compress` | `false` | Включить сжатие |
 | `-simple` | `true` | Простой режим (один файл, без шифрования) |
 
 ## Self-hosted relay
 
-### Docker
+### Запуск
 
 ```bash
 git clone https://github.com/SettlerNVG/filedrop.git
 cd filedrop
+make run-relay
+```
+
+При запуске relay покажет ваш публичный IP для подключения.
+
+### Docker
+
+```bash
 docker-compose up -d
 ```
 
@@ -105,26 +120,24 @@ docker-compose up -d
 |------|--------------|----------|
 | `-port` | `9000` | Порт сервера |
 | `-auth` | `false` | Требовать аутентификацию |
-| `-genkey` | - | Сгенерировать API ключ |
 
 ## Архитектура
 
 ```
 ┌──────────────┐                ┌──────────────┐                ┌──────────────┐
 │    Sender    │ ──── TCP ────► │    Relay     │ ◄──── TCP ──── │   Receiver   │
-│              │   encrypted    │   (Docker)   │   encrypted    │              │
+│              │   encrypted    │  5.18.196.229│   encrypted    │              │
 └──────────────┘                └──────────────┘                └──────────────┘
 ```
 
 - Relay только пробрасывает байты, не видит содержимое (E2E шифрование)
 - Chunk size: 64KB для оптимальной скорости
-- Presence система для отслеживания онлайн пользователей
 
 ## TUI Интерфейс
 
 ```
 📁 FileDrop TUI
-User: Alice | Relay: localhost:9000
+User: Alice | Relay: 5.18.196.229:9000
 
 ┌─────────────────────────────────┐
 │ Main Menu                       │

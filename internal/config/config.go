@@ -6,16 +6,12 @@ import (
 	"strings"
 )
 
-// DefaultRelay is the default relay server address
-// This can be overridden by:
-// 1. -relay flag
-// 2. FILEDROP_RELAY environment variable
-// 3. ~/.filedrop/relay file
-const FallbackRelay = "localhost:9000"
+// DefaultRelay is the public relay server
+var DefaultRelay = "5.18.196.229:9000"
 
 // GetDefaultRelay returns the default relay address
 func GetDefaultRelay() string {
-	// 1. Check environment variable
+	// 1. Check environment variable (highest priority)
 	if relay := os.Getenv("FILEDROP_RELAY"); relay != "" {
 		return relay
 	}
@@ -32,8 +28,8 @@ func GetDefaultRelay() string {
 		}
 	}
 
-	// 3. Fallback
-	return FallbackRelay
+	// 3. Use default
+	return DefaultRelay
 }
 
 // SaveRelay saves relay address to config file
