@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 
+	"filedrop/internal/config"
+
 	"github.com/charmbracelet/bubbles/filepicker"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/progress"
@@ -670,17 +672,33 @@ func (m model) acceptTransfer(fromUserID string) tea.Cmd {
 }
 
 func main() {
-	relayAddr := flag.String("relay", "", "Relay server address (required)")
+	defaultRelay := config.GetDefaultRelay()
+	relayAddr := flag.String("relay", defaultRelay, "Relay server address")
 	username := flag.String("name", "", "Your display name")
 	flag.Parse()
 
-	if *relayAddr == "" {
-		fmt.Println("❌ Error: -relay flag is required")
-		fmt.Println("Example: filedrop-tui -relay 192.168.1.100:9000")
-		os.Exit(1)
+	relay := *relayAddr
+	
+	// Try to connect, fallback to localhost if public IP fails
+	conn, err := net.DialTimeout("tcp", relay, 3*time.Second)
+	if err != nil {
+		// Try localhost as fallback (for local relay)
+		localRelay := "localhost:9000"
+		conn, err = net.DialTimeout("tcp", localRelay, 2*time.Second)
+		if err != nil {
+			fmt.Printf("❌ Cannot connect to relay at %s\n\n", relay)
+			fmt.Println("Options:")
+			fmt.Println("  1. Start relay:        make run-relay")
+			fmt.Println("  2. Connect to remote:  filedrop-tui -relay <ip>:9000")
+			os.Exit(1)
+		}
+		relay = localRelay
+		fmt.Printf("📡 Connected to local relay: %s\n", relay)
+		time.Sleep(500 * time.Millisecond)
 	}
+	conn.Close()
 
-	p := tea.NewProgram(initialModel(*relayAddr, *username), tea.WithAltScreen())
+	p := tea.NewProgram(initialModel(relay, *username), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)

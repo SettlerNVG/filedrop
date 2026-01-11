@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"filedrop/internal/config"
 	"filedrop/internal/crypto"
 	"filedrop/internal/transfer"
 
@@ -283,7 +284,8 @@ func receiveSimple(relayAddr, code, outputDir string) error {
 }
 
 func main() {
-	relayAddr := flag.String("relay", "", "Relay server address (required)")
+	defaultRelay := config.GetDefaultRelay()
+	relayAddr := flag.String("relay", defaultRelay, "Relay server address")
 	outputDir := flag.String("output", ".", "Output directory")
 	password := flag.String("password", "", "Encryption password")
 	key := flag.String("key", "", "Encryption key (for receive)")
@@ -293,30 +295,24 @@ func main() {
 
 	args := flag.Args()
 	if len(args) < 1 {
-		fmt.Println(`FileDrop - P2P File Transfer
+		fmt.Printf(`FileDrop - P2P File Transfer
 
 Usage:
-  filedrop -relay <server:port> send <file>      Send files
-  filedrop -relay <server:port> receive <code>   Receive files
+  filedrop send <file>           Send a file
+  filedrop receive <code>        Receive a file
+
+Current relay: %s
 
 Flags:
-  -relay string      Relay server address (required)
+  -relay string      Relay server (default from config)
   -output string     Output directory (default ".")
   -password string   Encryption password
-  -key string        Encryption key (for receive)
   -compress          Enable compression
-  -simple            Simple mode - single file, no encryption (default)
 
 Examples:
-  filedrop -relay 192.168.1.100:9000 send myfile.zip
-  filedrop -relay myserver.com:9000 receive ABC123`)
-		os.Exit(1)
-	}
-
-	relay := *relayAddr
-	if relay == "" {
-		fmt.Println("❌ Error: -relay flag is required")
-		fmt.Println("Example: filedrop -relay 192.168.1.100:9000 send myfile.zip")
+  filedrop send myfile.zip
+  filedrop receive ABC123
+`, defaultRelay)
 		os.Exit(1)
 	}
 
@@ -324,24 +320,24 @@ Examples:
 	switch args[0] {
 	case "send":
 		if len(args) < 2 {
-			fmt.Println("Usage: filedrop -relay <server:port> send <file/folder>")
+			fmt.Println("Usage: filedrop send <file/folder>")
 			os.Exit(1)
 		}
 		if *simple {
-			err = sendSimple(relay, args[1])
+			err = sendSimple(*relayAddr, args[1])
 		} else {
-			err = sendFiles(relay, args[1:], *password, *compress)
+			err = sendFiles(*relayAddr, args[1:], *password, *compress)
 		}
 
 	case "receive", "recv":
 		if len(args) < 2 {
-			fmt.Println("Usage: filedrop -relay <server:port> receive <code>")
+			fmt.Println("Usage: filedrop receive <code>")
 			os.Exit(1)
 		}
 		if *simple {
-			err = receiveSimple(relay, args[1], *outputDir)
+			err = receiveSimple(*relayAddr, args[1], *outputDir)
 		} else {
-			err = receiveFiles(relay, args[1], *outputDir, *password, *key)
+			err = receiveFiles(*relayAddr, args[1], *outputDir, *password, *key)
 		}
 
 	default:

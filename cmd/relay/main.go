@@ -194,6 +194,7 @@ func (r *RelayServer) handleConnection(conn net.Conn) {
 	// Rate limiting
 	ip := strings.Split(remoteAddr, ":")[0]
 	if !r.auth.CheckRateLimit(ip) {
+		log.Printf("[%s] Rate limited", ip)
 		conn.Write([]byte("ERROR Rate limited\n"))
 		conn.Close()
 		return
@@ -210,13 +211,34 @@ func (r *RelayServer) handleConnection(conn net.Conn) {
 
 	cmd := strings.TrimSpace(string(buf[:n]))
 	parts := strings.SplitN(cmd, " ", 3)
-	if len(parts) < 2 {
-		conn.Write([]byte("ERROR Invalid command\n"))
+	
+	if len(parts) < 1 {
+		conn.Write([]byte("ERROR Empty command\n"))
 		conn.Close()
 		return
 	}
 
 	action := parts[0]
+	log.Printf("[%s] Command: %s", ip, action)
+
+	// Commands that don't require arguments
+	switch action {
+	case "USERS":
+		r.handleUsers(conn)
+		return
+	case "STATS":
+		r.handleStats(conn)
+		return
+	}
+
+	// Commands that require at least one argument
+	if len(parts) < 2 {
+		log.Printf("[%s] Invalid command: %s", ip, cmd)
+		conn.Write([]byte("ERROR Invalid command\n"))
+		conn.Close()
+		return
+	}
+
 	var code, token string
 
 	if r.requireAuth {
@@ -244,21 +266,15 @@ func (r *RelayServer) handleConnection(conn net.Conn) {
 		r.handleReceiver(conn, code)
 	case "AUTH":
 		r.handleAuth(conn, code) // code is actually apiKey here
-	case "STATS":
-		r.handleStats(conn)
 	case "REGISTER":
 		// REGISTER <userID> <username>
-		if len(parts) >= 2 {
-			username := code
-			if len(parts) >= 3 {
-				username = parts[2]
-			}
-			r.handleRegister(conn, code, username)
+		username := code
+		if len(parts) >= 3 {
+			username = parts[2]
 		}
+		r.handleRegister(conn, code, username)
 	case "HEARTBEAT":
 		r.handleHeartbeat(conn, code)
-	case "USERS":
-		r.handleUsers(conn)
 	case "UNREGISTER":
 		r.handleUnregister(conn, code)
 	case "SENDTO":
@@ -280,6 +296,7 @@ func (r *RelayServer) handleConnection(conn net.Conn) {
 	case "PENDING":
 		r.handlePending(conn, code)
 	default:
+		log.Printf("Unknown command: %s", action)
 		conn.Write([]byte("ERROR Unknown command\n"))
 		conn.Close()
 	}
