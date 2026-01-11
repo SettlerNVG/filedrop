@@ -21,6 +21,7 @@ curl -fsSL https://raw.githubusercontent.com/SettlerNVG/filedrop/main/install.sh
 - ✅ Аутентификация на relay (опционально)
 - ✅ Rate limiting
 - ✅ Прогресс-бар со скоростью
+- ✅ **TUI интерфейс** — видеть онлайн пользователей и передавать файлы напрямую
 
 ## Быстрый старт
 
@@ -34,7 +35,18 @@ docker-compose up -d
 make run-relay
 ```
 
-### 2. Отправка файла
+### 2. TUI режим (рекомендуется)
+
+```bash
+filedrop-tui -relay your-server:9000
+```
+
+В TUI вы можете:
+- Видеть всех онлайн пользователей
+- Выбрать пользователя и отправить ему файл
+- Принять входящие передачи
+
+### 3. CLI режим — Отправка файла
 
 ```bash
 filedrop -relay your-server:9000 send myfile.zip
@@ -42,7 +54,7 @@ filedrop -relay your-server:9000 send myfile.zip
 
 Получишь код, например: `A1B2C3`
 
-### 3. Получение файла
+### 4. CLI режим — Получение файла
 
 ```bash
 filedrop -relay your-server:9000 receive A1B2C3
@@ -106,6 +118,33 @@ docker-compose up -d
 
 - Relay только пробрасывает байты, не видит содержимое (E2E шифрование)
 - Chunk size: 64KB для оптимальной скорости
+- Presence система для отслеживания онлайн пользователей
+
+## TUI Интерфейс
+
+```
+📁 FileDrop TUI
+User: Alice | Relay: localhost:9000
+
+┌─────────────────────────────────┐
+│ Main Menu                       │
+│                                 │
+│ [1/u] Browse online users       │
+│ [2/p] Check pending transfers   │
+│ [r]   Refresh                   │
+│ [q]   Quit                      │
+│                                 │
+│ Online users: 3                 │
+└─────────────────────────────────┘
+```
+
+Клавиши:
+- `1` или `u` — список онлайн пользователей
+- `2` или `p` — входящие запросы на передачу
+- `r` — обновить
+- `Enter` — выбрать пользователя/файл
+- `Esc` — назад
+- `q` — выход
 
 ## License
 

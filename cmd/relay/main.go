@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -27,12 +28,25 @@ type Session struct {
 	UserID      string
 }
 
+// DirectTransfer represents a direct user-to-user transfer request
+type DirectTransfer struct {
+	FromUser   string
+	ToUser     string
+	SenderConn net.Conn
+	RecvConn   net.Conn
+	Ready      chan struct{}
+	Done       chan struct{}
+	Accepted   bool
+}
+
 type RelayServer struct {
-	sessions    map[string]*Session
-	mu          sync.RWMutex
-	auth        *relay.AuthManager
-	requireAuth bool
-	stats       *Stats
+	sessions        map[string]*Session
+	directTransfers map[string]*DirectTransfer // key: "fromUser:toUser"
+	mu              sync.RWMutex
+	auth            *relay.AuthManager
+	presence        *relay.PresenceManager
+	requireAuth     bool
+	stats           *Stats
 }
 
 type Stats struct {
@@ -46,10 +60,12 @@ func NewRelayServer(requireAuth bool) *RelayServer {
 	auth.StartCleanupRoutine()
 
 	return &RelayServer{
-		sessions:    make(map[string]*Session),
-		auth:        auth,
-		requireAuth: requireAuth,
-		stats:       &Stats{},
+		sessions:        make(map[string]*Session),
+		directTransfers: make(map[string]*DirectTransfer),
+		auth:            auth,
+		presence:        relay.NewPresenceManager(),
+		requireAuth:     requireAuth,
+		stats:           &Stats{},
 	}
 }
 
@@ -147,6 +163,39 @@ func (r *RelayServer) handleConnection(conn net.Conn) {
 		r.handleAuth(conn, code) // code is actually apiKey here
 	case "STATS":
 		r.handleStats(conn)
+	case "REGISTER":
+		// REGISTER <userID> <username>
+		if len(parts) >= 2 {
+			username := code
+			if len(parts) >= 3 {
+				username = parts[2]
+			}
+			r.handleRegister(conn, code, username)
+		}
+	case "HEARTBEAT":
+		r.handleHeartbeat(conn, code)
+	case "USERS":
+		r.handleUsers(conn)
+	case "UNREGISTER":
+		r.handleUnregister(conn, code)
+	case "SENDTO":
+		// SENDTO <targetUserID> <fromUserID>
+		if len(parts) >= 3 {
+			r.handleSendTo(conn, code, parts[2])
+		} else {
+			conn.Write([]byte("ERROR Usage: SENDTO <targetUserID> <fromUserID>\n"))
+			conn.Close()
+		}
+	case "ACCEPT":
+		// ACCEPT <fromUserID> <myUserID>
+		if len(parts) >= 3 {
+			r.handleAccept(conn, code, parts[2])
+		} else {
+			conn.Write([]byte("ERROR Usage: ACCEPT <fromUserID> <myUserID>\n"))
+			conn.Close()
+		}
+	case "PENDING":
+		r.handlePending(conn, code)
 	default:
 		conn.Write([]byte("ERROR Unknown command\n"))
 		conn.Close()
@@ -280,6 +329,167 @@ func formatBytes(bytes int64) string {
 		exp++
 	}
 	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
+}
+
+// handleRegister registers user for presence
+func (r *RelayServer) handleRegister(conn net.Conn, userID, username string) {
+	ip := strings.Split(conn.RemoteAddr().String(), ":")[0]
+	r.presence.Register(userID, username, ip)
+	conn.Write([]byte("OK\n"))
+	log.Printf("[PRESENCE] User %s (%s) registered", username, userID)
+
+	// Keep connection alive for heartbeats
+	go func() {
+		reader := bufio.NewReader(conn)
+		for {
+			conn.SetReadDeadline(time.Now().Add(2 * time.Minute))
+			line, err := reader.ReadString('\n')
+			if err != nil {
+				r.presence.Unregister(userID)
+				conn.Close()
+				log.Printf("[PRESENCE] User %s disconnected", userID)
+				return
+			}
+			cmd := strings.TrimSpace(line)
+			if cmd == "PING" {
+				r.presence.Heartbeat(userID)
+				conn.Write([]byte("PONG\n"))
+			} else if cmd == "QUIT" {
+				r.presence.Unregister(userID)
+				conn.Close()
+				return
+			}
+		}
+	}()
+}
+
+// handleHeartbeat updates user presence
+func (r *RelayServer) handleHeartbeat(conn net.Conn, userID string) {
+	r.presence.Heartbeat(userID)
+	conn.Write([]byte("OK\n"))
+	conn.Close()
+}
+
+// handleUsers returns list of online users
+func (r *RelayServer) handleUsers(conn net.Conn) {
+	users := r.presence.ToJSON()
+	conn.Write([]byte(fmt.Sprintf("USERS %s\n", string(users))))
+	conn.Close()
+}
+
+// handleUnregister removes user from presence
+func (r *RelayServer) handleUnregister(conn net.Conn, userID string) {
+	r.presence.Unregister(userID)
+	conn.Write([]byte("OK\n"))
+	conn.Close()
+}
+
+// handleSendTo initiates direct transfer to user
+func (r *RelayServer) handleSendTo(conn net.Conn, targetUserID, fromUserID string) {
+	// Check if target user is online
+	targetUser := r.presence.GetUser(targetUserID)
+	if targetUser == nil || !targetUser.Online {
+		conn.Write([]byte("ERROR User not online\n"))
+		conn.Close()
+		return
+	}
+
+	key := fromUserID + ":" + targetUserID
+
+	r.mu.Lock()
+	transfer := &DirectTransfer{
+		FromUser:   fromUserID,
+		ToUser:     targetUserID,
+		SenderConn: conn,
+		Ready:      make(chan struct{}),
+		Done:       make(chan struct{}),
+	}
+	r.directTransfers[key] = transfer
+	r.mu.Unlock()
+
+	conn.Write([]byte("WAITING\n"))
+	log.Printf("[DIRECT] %s wants to send to %s", fromUserID, targetUserID)
+
+	// Wait for receiver to accept
+	select {
+	case <-transfer.Ready:
+		if transfer.Accepted {
+			conn.Write([]byte("CONNECTED\n"))
+			log.Printf("[DIRECT] Transfer %s -> %s starting", fromUserID, targetUserID)
+			r.relayDirect(transfer)
+		} else {
+			conn.Write([]byte("ERROR Transfer rejected\n"))
+		}
+	case <-time.After(5 * time.Minute):
+		conn.Write([]byte("ERROR Timeout waiting for receiver\n"))
+		conn.Close()
+	}
+
+	r.mu.Lock()
+	delete(r.directTransfers, key)
+	r.mu.Unlock()
+}
+
+// handleAccept accepts incoming transfer
+func (r *RelayServer) handleAccept(conn net.Conn, fromUserID, myUserID string) {
+	key := fromUserID + ":" + myUserID
+
+	r.mu.RLock()
+	transfer, exists := r.directTransfers[key]
+	r.mu.RUnlock()
+
+	if !exists {
+		conn.Write([]byte("ERROR No pending transfer\n"))
+		conn.Close()
+		return
+	}
+
+	transfer.RecvConn = conn
+	transfer.Accepted = true
+	conn.Write([]byte("CONNECTED\n"))
+	log.Printf("[DIRECT] %s accepted transfer from %s", myUserID, fromUserID)
+	close(transfer.Ready)
+
+	<-transfer.Done
+}
+
+// handlePending returns pending transfers for user
+func (r *RelayServer) handlePending(conn net.Conn, userID string) {
+	r.mu.RLock()
+	var pending []string
+	for _, transfer := range r.directTransfers {
+		if transfer.ToUser == userID {
+			pending = append(pending, transfer.FromUser)
+		}
+	}
+	r.mu.RUnlock()
+
+	data, _ := json.Marshal(pending)
+	conn.Write([]byte(fmt.Sprintf("PENDING %s\n", string(data))))
+	conn.Close()
+}
+
+// relayDirect relays data between two users
+func (r *RelayServer) relayDirect(transfer *DirectTransfer) {
+	defer close(transfer.Done)
+	defer transfer.SenderConn.Close()
+	defer transfer.RecvConn.Close()
+
+	done := make(chan struct{}, 2)
+
+	go func() {
+		n, _ := io.Copy(transfer.RecvConn, transfer.SenderConn)
+		atomic.AddInt64(&r.stats.BytesTransferred, n)
+		done <- struct{}{}
+	}()
+
+	go func() {
+		io.Copy(transfer.SenderConn, transfer.RecvConn)
+		done <- struct{}{}
+	}()
+
+	<-done
+	log.Printf("[DIRECT] Transfer %s -> %s complete", transfer.FromUser, transfer.ToUser)
 }
 
 func main() {

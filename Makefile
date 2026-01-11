@@ -1,7 +1,7 @@
-.PHONY: build build-client build-relay run-relay docker-build docker-up docker-down clean
+.PHONY: build build-client build-relay build-tui run-relay run-tui docker-build docker-up docker-down clean
 
 # Build all
-build: build-client build-relay
+build: build-client build-relay build-tui
 
 # Build client binary
 build-client:
@@ -10,6 +10,14 @@ build-client:
 # Build relay binary
 build-relay:
 	go build -o bin/relay ./cmd/relay
+
+# Build TUI binary
+build-tui:
+	go build -o bin/filedrop-tui ./cmd/tui
+
+# Run TUI
+run-tui:
+	go run ./cmd/tui
 
 # Run relay locally
 run-relay:
@@ -34,11 +42,16 @@ build-all:
 	# Linux
 	GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o bin/filedrop-linux-amd64 ./cmd/client
 	GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o bin/filedrop-linux-arm64 ./cmd/client
+	GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o bin/filedrop-tui-linux-amd64 ./cmd/tui
+	GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o bin/filedrop-tui-linux-arm64 ./cmd/tui
 	# macOS
 	GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o bin/filedrop-darwin-amd64 ./cmd/client
 	GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o bin/filedrop-darwin-arm64 ./cmd/client
+	GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o bin/filedrop-tui-darwin-amd64 ./cmd/tui
+	GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o bin/filedrop-tui-darwin-arm64 ./cmd/tui
 	# Windows
 	GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o bin/filedrop-windows-amd64.exe ./cmd/client
+	GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o bin/filedrop-tui-windows-amd64.exe ./cmd/tui
 	@echo "✅ Built for all platforms"
 
 # Clean build artifacts
