@@ -35,9 +35,6 @@ var (
 			Foreground(lipgloss.Color("#7D56F4")).
 			Bold(true)
 
-	normalStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FFFFFF"))
-
 	dimStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#666666"))
 
@@ -80,7 +77,6 @@ const (
 // Messages
 type usersMsg []User
 type pendingMsg []string
-type transferStartMsg struct{}
 type transferProgressMsg float64
 type transferDoneMsg struct{ err error }
 type tickMsg time.Time
@@ -193,7 +189,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.userList.SetSize(msg.Width-4, msg.Height-10)
-		m.filePicker.Height = msg.Height - 10
+		m.filePicker.SetHeight(msg.Height - 10)
 		return m, nil
 
 	case usersMsg:

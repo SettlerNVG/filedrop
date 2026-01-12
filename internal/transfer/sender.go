@@ -20,10 +20,9 @@ const (
 
 // Sender handles file sending
 type Sender struct {
-	conn       io.ReadWriter
-	key        []byte
-	compress   bool
-	onProgress func(sent, total int64)
+	conn     io.ReadWriter
+	key      []byte
+	compress bool
 }
 
 // NewSender creates new sender
