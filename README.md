@@ -22,6 +22,7 @@ Or download binaries from [Releases](https://github.com/SettlerNVG/filedrop/rele
 - ✅ AES-256-GCM encryption (end-to-end)
 - ✅ Gzip compression
 - ✅ Resume interrupted transfers
+- ✅ Graceful shutdown — progress saved on Ctrl+C
 - ✅ Progress bar with speed
 - ✅ TUI interface — see online users and transfer files
 - ✅ Auto-connect to public relay
