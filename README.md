@@ -1,53 +1,53 @@
 # FileDrop
 
-P2P файловый обмен через relay-сервер. Работает между любыми ОС (Linux, macOS, Windows).
+P2P file sharing via relay server. Works across any OS (Linux, macOS, Windows).
 
-## Установка
+## Installation
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/SettlerNVG/filedrop/main/install.sh | bash
 ```
 
-Или скачай бинарник из [Releases](https://github.com/SettlerNVG/filedrop/releases).
+Or download binaries from [Releases](https://github.com/SettlerNVG/filedrop/releases).
 
-## Возможности
+## Features
 
-- ✅ Передача файлов любого размера (потоковая, не грузит RAM)
-- ✅ Передача папок с сохранением структуры  
-- ✅ Шифрование AES-256-GCM (end-to-end)
-- ✅ Сжатие данных (gzip)
-- ✅ Докачка при обрыве соединения
-- ✅ Прогресс-бар со скоростью
-- ✅ TUI интерфейс — видеть онлайн пользователей и передавать файлы
-- ✅ Автоподключение к публичному relay
+- ✅ Transfer files of any size (streaming, low memory usage)
+- ✅ Transfer folders with preserved structure
+- ✅ AES-256-GCM encryption (end-to-end)
+- ✅ Gzip compression
+- ✅ Resume interrupted transfers
+- ✅ Progress bar with speed
+- ✅ TUI interface — see online users and transfer files
+- ✅ Auto-connect to public relay
 
-## Быстрый старт
+## Quick Start
 
-Клиент автоматически подключается к публичному relay-серверу (адрес обновляется динамически).
+Client automatically connects to the public relay server (address updates dynamically).
 
-### TUI режим (рекомендуется)
+### TUI Mode (recommended)
 
 ```bash
 filedrop-tui
 ```
 
-В TUI:
-- Видеть всех онлайн пользователей
-- Выбрать пользователя и отправить файл
-- Принять входящие передачи
+In TUI you can:
+- See all online users
+- Select a user and send files
+- Accept incoming transfers
 
-### CLI режим
+### CLI Mode
 
 ```bash
-# Отправить файл
+# Send a file
 filedrop send myfile.zip
-# Получишь код: A1B2C3
+# You'll get a code: A1B2C3
 
-# Получить файл  
+# Receive a file
 filedrop receive A1B2C3
 ```
 
-## Как это работает
+## How It Works
 
 ```
 ┌──────────────┐                ┌──────────────┐                ┌──────────────┐
@@ -56,71 +56,71 @@ filedrop receive A1B2C3
 └──────────────┘                └──────────────┘                └──────────────┘
 ```
 
-1. Владелец запускает relay с публичным доступом через ngrok
-2. Адрес relay автоматически публикуется в этом репозитории
-3. Клиенты при запуске читают актуальный адрес и подключаются
+1. Owner runs relay with public access via ngrok
+2. Relay address is automatically published to this repository
+3. Clients fetch the current address on startup and connect
 
-## Использование своего relay
+## Using Custom Relay
 
 ```bash
-# Через флаг
+# Via flag
 filedrop -relay myserver:9000 send file.zip
 filedrop-tui -relay myserver:9000
 
-# Через переменную окружения
+# Via environment variable
 export FILEDROP_RELAY=myserver:9000
 
-# Через конфиг файл
+# Via config file
 echo "myserver:9000" > ~/.filedrop/relay
 ```
 
-## Запуск relay-сервера
+## Running Your Own Relay
 
-### Локально (для тестов)
+### Local (for testing)
 
 ```bash
 make run-relay
 ```
 
-### Публично (через ngrok)
+### Public (via ngrok)
 
-Требуется ngrok с привязанной картой для TCP туннелей.
+Requires ngrok with a linked card for TCP tunnels.
 
 ```bash
-# Установка
+# Install
 brew install ngrok
 ngrok config add-authtoken <your-token>
 
-# Запуск
+# Run
 make run-relay-public
 ```
 
-Скрипт автоматически:
-- Запустит relay-сервер
-- Создаст ngrok туннель  
-- Опубликует адрес в репозиторий
-- Клиенты автоматически подключатся
+The script will automatically:
+- Start the relay server
+- Create ngrok tunnel
+- Publish address to repository
+- Clients will auto-connect
 
-## Флаги
+## Flags
 
-| Флаг | Описание |
-|------|----------|
-| `-relay` | Адрес relay-сервера |
-| `-output` | Папка для сохранения |
-| `-password` | Пароль шифрования |
-| `-compress` | Включить сжатие |
+| Flag | Description |
+|------|-------------|
+| `-relay` | Relay server address |
+| `-output` | Output directory |
+| `-password` | Encryption password |
+| `-compress` | Enable compression |
 
-## TUI управление
+## TUI Controls
 
-| Клавиша | Действие |
-|---------|----------|
-| `1` / `u` | Список онлайн пользователей |
-| `2` / `p` | Входящие запросы |
-| `r` | Обновить |
-| `Enter` | Выбрать |
-| `Esc` | Назад |
-| `q` | Выход |
+| Key | Action |
+|-----|--------|
+| `1` / `u` | List online users |
+| `2` / `p` | Pending transfers |
+| `r` | Refresh |
+| `Enter` | Select |
+| `Esc` | Back |
+| `q` | Quit |
 
 ## License
 
-MIT
+Apache 2.0
