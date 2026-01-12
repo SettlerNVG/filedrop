@@ -182,8 +182,8 @@ func (r *Receiver) receiveFile(path string, info FileInfo, meta *TransferMetadat
 
 		// Read chunk size
 		var chunkSize uint32
-		if err := binary.Read(r.conn, binary.BigEndian, &chunkSize); err != nil {
-			return err
+		if readErr := binary.Read(r.conn, binary.BigEndian, &chunkSize); readErr != nil {
+			return readErr
 		}
 
 		if chunkSize == 0 {
@@ -192,19 +192,20 @@ func (r *Receiver) receiveFile(path string, info FileInfo, meta *TransferMetadat
 
 		var data []byte
 		if encReader != nil {
-			data, err = encReader.ReadChunk(int(chunkSize))
-			if err != nil {
-				return err
+			var chunkErr error
+			data, chunkErr = encReader.ReadChunk(int(chunkSize))
+			if chunkErr != nil {
+				return chunkErr
 			}
 		} else {
 			data = make([]byte, chunkSize)
-			if _, err := io.ReadFull(r.conn, data); err != nil {
-				return err
+			if _, readFullErr := io.ReadFull(r.conn, data); readFullErr != nil {
+				return readFullErr
 			}
 		}
 
-		if _, err := file.Write(data); err != nil {
-			return err
+		if _, writeErr := file.Write(data); writeErr != nil {
+			return writeErr
 		}
 
 		// Обновляем прогресс
