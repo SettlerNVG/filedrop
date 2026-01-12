@@ -136,7 +136,7 @@ jobs:
         ./bin/filedrop-tui --help > /dev/null 2>&1 && echo "✅ filedrop-tui works" || echo "⚠️ tui help failed (expected)"
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: binaries-${{ github.sha }}
         path: bin/
