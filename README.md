@@ -1,5 +1,10 @@
 # FileDrop
 
+[![CI](https://github.com/SettlerNVG/filedrop/workflows/CI/badge.svg)](https://github.com/SettlerNVG/filedrop/actions)
+[![codecov](https://codecov.io/gh/SettlerNVG/filedrop/branch/main/graph/badge.svg)](https://codecov.io/gh/SettlerNVG/filedrop)
+[![Go Report Card](https://goreportcard.com/badge/github.com/SettlerNVG/filedrop)](https://goreportcard.com/report/github.com/SettlerNVG/filedrop)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
 P2P file sharing via relay server. Works across any OS (Linux, macOS, Windows).
 
 ## Installation

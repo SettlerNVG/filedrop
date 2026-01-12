@@ -1,0 +1,22 @@
+coverage:
+  status:
+    project:
+      default:
+        target: 70%
+        threshold: 5%
+        if_not_found: success
+    patch:
+      default:
+        target: 80%
+        threshold: 10%
+        if_not_found: success
+
+comment:
+  layout: "reach,diff,flags,tree"
+  behavior: default
+  require_changes: false
+
+ignore:
+  - "cmd/"          # CLI applications
+  - "**/*_test.go"  # Test files
+  - "coverage.html" # Coverage reports

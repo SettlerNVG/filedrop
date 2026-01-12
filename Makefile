@@ -72,3 +72,31 @@ test-local:
 	@go run ./cmd/relay -port 9000 &
 	@sleep 1
 	@echo "Test with: ./bin/filedrop send <file>"
+
+# Run tests
+test:
+	go test ./...
+
+# Run tests with coverage
+test-coverage:
+	go test -coverprofile=coverage.out ./...
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report: coverage.html"
+
+# Run tests and show coverage in terminal
+test-coverage-func:
+	go test -coverprofile=coverage.out ./...
+	go tool cover -func=coverage.out
+
+# Quality checks (like CI)
+quality:
+	@echo "Running quality checks..."
+	go test ./...
+	go vet ./...
+	gofmt -s -l .
+	@echo "✅ All quality checks passed"
+
+# Security scan
+security:
+	@which gosec > /dev/null || go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+	gosec ./...

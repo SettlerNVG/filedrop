@@ -579,7 +579,7 @@ func (m model) startTransfer() tea.Cmd {
 
 		response = strings.TrimSpace(response)
 		if response != "WAITING" {
-			return transferDoneMsg{err: fmt.Errorf(response)}
+			return transferDoneMsg{err: fmt.Errorf("unexpected response: %s", response)}
 		}
 
 		// Wait for connection
@@ -588,7 +588,7 @@ func (m model) startTransfer() tea.Cmd {
 			return transferDoneMsg{err: err}
 		}
 		if strings.TrimSpace(response) != "CONNECTED" {
-			return transferDoneMsg{err: fmt.Errorf(response)}
+			return transferDoneMsg{err: fmt.Errorf("send connection failed: %s", strings.TrimSpace(response))}
 		}
 
 		// Send file
@@ -643,7 +643,7 @@ func (m model) acceptTransfer(fromUserID string) tea.Cmd {
 		}
 
 		if strings.TrimSpace(response) != "CONNECTED" {
-			return transferDoneMsg{err: fmt.Errorf(response)}
+			return transferDoneMsg{err: fmt.Errorf("receive connection failed: %s", strings.TrimSpace(response))}
 		}
 
 		// Read metadata
