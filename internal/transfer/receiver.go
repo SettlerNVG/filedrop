@@ -67,13 +67,13 @@ func (r *Receiver) ReceiveFilesWithMetadata(meta *TransferMetadata) error {
 	// Check for existing partial transfer
 	resumeInfo := r.checkResume(meta)
 	if resumeInfo != nil {
-		r.conn.Write([]byte("R"))
+		_, _ = r.conn.Write([]byte("R"))
 		if err := WriteResumeInfo(r.conn, resumeInfo); err != nil {
 			return fmt.Errorf("send resume info: %w", err)
 		}
 		fmt.Printf("⏩ Resuming transfer from file %d\n", resumeInfo.CurrentFile)
 	} else {
-		r.conn.Write([]byte("A")) // ACK, start fresh
+		_, _ = r.conn.Write([]byte("A")) // ACK, start fresh
 	}
 
 	// Create progress bar
@@ -94,7 +94,7 @@ func (r *Receiver) ReceiveFilesWithMetadata(meta *TransferMetadata) error {
 
 	// Skip already received bytes in progress
 	if resumeInfo != nil {
-		bar.Add64(resumeInfo.BytesWritten)
+		_ = bar.Add64(resumeInfo.BytesWritten)
 	}
 
 	startIdx := 0
@@ -211,7 +211,7 @@ func (r *Receiver) receiveFile(path string, info FileInfo, meta *TransferMetadat
 		r.bytesWritten += int64(len(data))
 		r.mu.Unlock()
 
-		bar.Add(len(data))
+		_ = bar.Add(len(data))
 	}
 
 	// Set modification time
@@ -244,7 +244,7 @@ func (r *Receiver) saveProgress(meta *TransferMetadata, fileIdx int, bytesWritte
 
 	data, _ := json.Marshal(info)
 	progressFile := filepath.Join(r.outputDir, ".filedrop_progress_"+meta.TransferID)
-	os.WriteFile(progressFile, data, 0644)
+	_ = os.WriteFile(progressFile, data, 0644)
 }
 
 func (r *Receiver) cleanProgress(transferID string) {

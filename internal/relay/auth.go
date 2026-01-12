@@ -49,7 +49,7 @@ func NewAuthManager() *AuthManager {
 // GenerateAPIKey creates new API key
 func (am *AuthManager) GenerateAPIKey(userID string) string {
 	b := make([]byte, 32)
-	rand.Read(b)
+	_, _ = rand.Read(b)
 	key := hex.EncodeToString(b)
 
 	am.mu.Lock()
@@ -76,7 +76,7 @@ func (am *AuthManager) GenerateToken(apiKey string) (*Token, error) {
 	}
 
 	b := make([]byte, 32)
-	rand.Read(b)
+	_, _ = rand.Read(b)
 	tokenValue := hex.EncodeToString(b)
 
 	token := &Token{

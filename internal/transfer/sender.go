@@ -37,7 +37,7 @@ func NewSender(conn io.ReadWriter, key []byte, compress bool) *Sender {
 // GenerateTransferID creates unique transfer ID
 func GenerateTransferID() string {
 	b := make([]byte, 8)
-	rand.Read(b)
+	_, _ = rand.Read(b)
 	return hex.EncodeToString(b)
 }
 
@@ -167,7 +167,7 @@ func (s *Sender) sendFile(path string, info FileInfo, bar *progressbar.ProgressB
 		if _, err := file.Seek(resumeFrom, 0); err != nil {
 			return fmt.Errorf("seek: %w", err)
 		}
-		bar.Add64(resumeFrom)
+		_ = bar.Add64(resumeFrom)
 	}
 
 	remaining := info.Size - resumeFrom
@@ -211,7 +211,7 @@ func (s *Sender) sendFile(path string, info FileInfo, bar *progressbar.ProgressB
 		}
 
 		remaining -= int64(n)
-		bar.Add(n)
+		_ = bar.Add(n)
 	}
 
 	// Send end marker
