@@ -187,7 +187,17 @@ func receiveFiles(relayAddr, code, outputDir, password, keyStr string) error {
 	}
 
 	receiver := transfer.NewReceiver(conn, key, outputDir)
-	return receiver.ReceiveFiles()
+	
+	// Получаем метаданные для настройки graceful shutdown
+	meta, err := receiver.ReceiveMetadata()
+	if err != nil {
+		return fmt.Errorf("receive metadata: %w", err)
+	}
+
+	// Настраиваем graceful shutdown ПЕРЕД началом скачивания
+	receiver.SetupShutdown(meta)
+
+	return receiver.ReceiveFilesWithMetadata(meta)
 }
 
 func sendSimple(relayAddr, filePath string) error {

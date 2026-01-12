@@ -10,23 +10,25 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"filedrop/internal/relay"
 )
 
 type Session struct {
-	Code        string
-	SenderConn  net.Conn
-	RecvConn    net.Conn
-	Ready       chan struct{}
-	Done        chan struct{}
-	BytesSent   int64
-	StartTime   time.Time
-	UserID      string
+	Code       string
+	SenderConn net.Conn
+	RecvConn   net.Conn
+	Ready      chan struct{}
+	Done       chan struct{}
+	BytesSent  int64
+	StartTime  time.Time
+	UserID     string
 }
 
 // DirectTransfer represents a direct user-to-user transfer request
@@ -48,6 +50,9 @@ type RelayServer struct {
 	presence        *relay.PresenceManager
 	requireAuth     bool
 	stats           *Stats
+	listener        net.Listener
+	wg              sync.WaitGroup // Счётчик активных сессий
+	shutdown        chan struct{}  // Сигнал "пора выходить"
 }
 
 type Stats struct {
@@ -67,6 +72,7 @@ func NewRelayServer(requireAuth bool) *RelayServer {
 		presence:        relay.NewPresenceManager(),
 		requireAuth:     requireAuth,
 		stats:           &Stats{},
+		shutdown:        make(chan struct{}),
 	}
 }
 
@@ -89,25 +95,25 @@ func getLocalIPs() []string {
 func getPublicIP() string {
 	// Try to get public IP from external service
 	client := &http.Client{Timeout: 3 * time.Second}
-	
+
 	services := []string{
 		"https://api.ipify.org",
 		"https://ifconfig.me/ip",
 		"https://icanhazip.com",
 	}
-	
+
 	for _, url := range services {
 		resp, err := client.Get(url)
 		if err != nil {
 			continue
 		}
 		defer resp.Body.Close()
-		
+
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			continue
 		}
-		
+
 		ip := strings.TrimSpace(string(body))
 		if net.ParseIP(ip) != nil {
 			return ip
@@ -116,22 +122,50 @@ func getPublicIP() string {
 	return ""
 }
 
+// handleShutdown обрабатывает сигналы завершения (Ctrl+C, SIGTERM)
+func (r *RelayServer) handleShutdown() {
+	sigChan := make(chan os.Signal, 1)
+	// Подписываемся на сигналы SIGINT (Ctrl+C) и SIGTERM
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	// Блокируемся до получения сигнала
+	sig := <-sigChan
+	log.Printf("Получен сигнал %v, начинаем graceful shutdown...", sig)
+
+	// Сигнализируем всем горутинам о завершении
+	close(r.shutdown)
+
+	// Закрываем listener - это заставит Accept() вернуть ошибку
+	r.listener.Close()
+
+	// Запускаем таймаут на случай зависших соединений
+	go func() {
+		time.Sleep(30 * time.Second) // Ждём максимум 30 секунд
+		log.Println("Таймаут graceful shutdown, принудительный выход")
+		os.Exit(1)
+	}()
+}
+
 func (r *RelayServer) Run(addr string) error {
-	listener, err := net.Listen("tcp", addr)
+	var err error
+	r.listener, err = net.Listen("tcp", addr)
 	if err != nil {
 		return err
 	}
-	defer listener.Close()
+	defer r.listener.Close()
+
+	// Start signals calls catcher
+	go r.handleShutdown()
 
 	port := strings.TrimPrefix(addr, ":")
-	
+
 	fmt.Println()
 	fmt.Println("╔════════════════════════════════════════════════════════════════╗")
 	fmt.Println("║                      🚀 FileDrop Relay                         ║")
 	fmt.Println("╠════════════════════════════════════════════════════════════════╣")
 	fmt.Printf("║  Port: %-56s║\n", port)
 	fmt.Println("╠════════════════════════════════════════════════════════════════╣")
-	
+
 	// Public IP for remote access
 	publicIP := getPublicIP()
 	if publicIP != "" {
@@ -140,16 +174,13 @@ func (r *RelayServer) Run(addr string) error {
 		fmt.Printf("║     %-58s║\n", connStr)
 		fmt.Println("║                                                                ║")
 	}
-	
-	fmt.Println("║  🏠 LOCAL ACCESS:                                               ║")
-	fmt.Printf("║     filedrop -relay localhost:%s send <file>                  ║\n", port)
-	
+
 	ips := getLocalIPs()
 	for _, ip := range ips {
 		connStr := fmt.Sprintf("filedrop -relay %s:%s send <file>", ip, port)
 		fmt.Printf("║     %-58s║\n", connStr)
 	}
-	
+
 	fmt.Println("╠════════════════════════════════════════════════════════════════╣")
 	fmt.Println("║  📱 TUI mode: filedrop-tui -relay <address>                    ║")
 	fmt.Println("╠════════════════════════════════════════════════════════════════╣")
@@ -167,14 +198,33 @@ func (r *RelayServer) Run(addr string) error {
 	// Start stats reporter
 	go r.reportStats()
 
+	// Основной цикл приёма соединений
 	for {
-		conn, err := listener.Accept()
+		conn, err := r.listener.Accept()
 		if err != nil {
-			log.Printf("Accept error: %v", err)
-			continue
+			// Проверяем, не мы ли сами закрыли listener
+			select {
+			case <-r.shutdown:
+				// Это graceful shutdown - ждём завершения активных соединений
+				log.Println("Ожидание завершения активных соединений...")
+				r.wg.Wait() // Ждём пока все горутины завершатся
+				log.Println("Все соединения завершены, выход")
+				return nil
+			default:
+				// Обычная ошибка - логируем и продолжаем
+				log.Printf("Accept error: %v", err)
+				continue
+			}
 		}
+
 		atomic.AddInt64(&r.stats.TotalConnections, 1)
-		go r.handleConnection(conn)
+
+		// Увеличиваем счётчик активных горутин
+		r.wg.Add(1)
+		go func() {
+			defer r.wg.Done() // Уменьшаем счётчик при завершении
+			r.handleConnection(conn)
+		}()
 	}
 }
 
@@ -211,7 +261,7 @@ func (r *RelayServer) handleConnection(conn net.Conn) {
 
 	cmd := strings.TrimSpace(string(buf[:n]))
 	parts := strings.SplitN(cmd, " ", 3)
-	
+
 	if len(parts) < 1 {
 		conn.Write([]byte("ERROR Empty command\n"))
 		conn.Close()
@@ -606,7 +656,7 @@ func main() {
 		fmt.Printf("API Key for %s: %s\n", *genKey, key)
 
 		// Save to file
-		f, _ := os.OpenFile("api_keys.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+		f, _ := os.OpenFile("api_keys.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 		defer f.Close()
 		fmt.Fprintf(f, "%s:%s\n", *genKey, key)
 		return

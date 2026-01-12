@@ -5,8 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"sync"
+	"syscall"
 
 	"filedrop/internal/crypto"
 
@@ -15,9 +19,13 @@ import (
 
 // Receiver handles file receiving
 type Receiver struct {
-	conn      io.ReadWriter
-	key       []byte
-	outputDir string
+	conn          io.ReadWriter
+	key           []byte
+	outputDir     string
+	currentFile   int
+	bytesWritten  int64
+	mu            sync.Mutex
+	shutdown      chan struct{}
 }
 
 // NewReceiver creates new receiver
@@ -26,7 +34,13 @@ func NewReceiver(conn io.ReadWriter, key []byte, outputDir string) *Receiver {
 		conn:      conn,
 		key:       key,
 		outputDir: outputDir,
+		shutdown:  make(chan struct{}),
 	}
+}
+
+// ReceiveMetadata получает метаданные передачи
+func (r *Receiver) ReceiveMetadata() (*TransferMetadata, error) {
+	return ReadMetadata(r.conn)
 }
 
 // ReceiveFiles receives multiple files
@@ -36,6 +50,11 @@ func (r *Receiver) ReceiveFiles() error {
 	if err != nil {
 		return fmt.Errorf("read metadata: %w", err)
 	}
+	return r.ReceiveFilesWithMetadata(meta)
+}
+
+// ReceiveFilesWithMetadata receives files using provided metadata
+func (r *Receiver) ReceiveFilesWithMetadata(meta *TransferMetadata) error {
 
 	fmt.Printf("📥 Receiving %d files (%s)\n", meta.TotalFiles, formatSize(meta.TotalSize))
 	if meta.Encrypted {
@@ -87,6 +106,12 @@ func (r *Receiver) ReceiveFiles() error {
 
 	// Receive files
 	for i := startIdx; i < len(meta.Files); i++ {
+		// Обновляем текущий файл и сбрасываем счётчик байт
+		r.mu.Lock()
+		r.currentFile = i
+		r.bytesWritten = resumeFrom
+		r.mu.Unlock()
+
 		fi := meta.Files[i]
 
 		outputPath := filepath.Join(r.outputDir, fi.Path)
@@ -108,6 +133,12 @@ func (r *Receiver) ReceiveFiles() error {
 			r.saveProgress(meta, i, resumeFrom)
 			return fmt.Errorf("receive %s: %w", fi.Path, err)
 		}
+		
+		// После успешного завершения файла сбрасываем прогресс
+		r.mu.Lock()
+		r.bytesWritten = 0
+		r.mu.Unlock()
+		
 		resumeFrom = 0
 	}
 
@@ -141,6 +172,13 @@ func (r *Receiver) receiveFile(path string, info FileInfo, meta *TransferMetadat
 	}
 
 	for {
+		// Проверяем сигнал завершения перед каждым чтением
+		select {
+		case <-r.shutdown:
+			return fmt.Errorf("передача прервана пользователем")
+		default:
+		}
+
 		// Read chunk size
 		var chunkSize uint32
 		if err := binary.Read(r.conn, binary.BigEndian, &chunkSize); err != nil {
@@ -167,6 +205,11 @@ func (r *Receiver) receiveFile(path string, info FileInfo, meta *TransferMetadat
 		if _, err := file.Write(data); err != nil {
 			return err
 		}
+
+		// Обновляем прогресс
+		r.mu.Lock()
+		r.bytesWritten += int64(len(data))
+		r.mu.Unlock()
 
 		bar.Add(len(data))
 	}
@@ -220,4 +263,28 @@ func formatSize(bytes int64) string {
 		exp++
 	}
 	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
+}
+
+// SetupShutdown настраивает обработку сигналов завершения
+func (r *Receiver) SetupShutdown(meta *TransferMetadata) {
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		sig := <-sigChan
+		log.Printf("Получен сигнал %v, сохраняю прогресс...", sig)
+
+		r.mu.Lock()
+		r.saveProgress(meta, r.currentFile, r.bytesWritten)
+		r.mu.Unlock()
+
+		close(r.shutdown)
+		log.Println("Прогресс сохранён, выход")
+		os.Exit(0)
+	}()
+}
+
+// SaveProgressTest - тестовый метод для проверки сохранения прогресса
+func (r *Receiver) SaveProgressTest(meta *TransferMetadata, fileIdx int, bytesWritten int64) {
+	r.saveProgress(meta, fileIdx, bytesWritten)
 }
