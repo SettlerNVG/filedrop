@@ -93,8 +93,8 @@ func WriteResumeInfo(w io.Writer, info *ResumeInfo) error {
 		return err
 	}
 
-	if err := binary.Write(w, binary.BigEndian, uint32(len(data))); err != nil {
-		return err
+	if writeErr := binary.Write(w, binary.BigEndian, uint32(len(data))); writeErr != nil {
+		return writeErr
 	}
 
 	_, err = w.Write(data)

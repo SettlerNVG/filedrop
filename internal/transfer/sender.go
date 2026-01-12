@@ -175,9 +175,10 @@ func (s *Sender) sendFile(path string, info FileInfo, bar *progressbar.ProgressB
 
 	var encWriter *crypto.EncryptedWriter
 	if s.key != nil {
-		encWriter, err = crypto.NewEncryptedWriter(s.conn, s.key)
-		if err != nil {
-			return err
+		var encErr error
+		encWriter, encErr = crypto.NewEncryptedWriter(s.conn, s.key)
+		if encErr != nil {
+			return encErr
 		}
 	}
 

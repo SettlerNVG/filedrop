@@ -153,8 +153,8 @@ func receiveFiles(relayAddr, code, outputDir, password, keyStr string) error {
 
 	// Read encryption mode
 	mode := make([]byte, 1)
-	if _, err := io.ReadFull(conn, mode); err != nil {
-		return fmt.Errorf("read mode: %w", err)
+	if _, readErr := io.ReadFull(conn, mode); readErr != nil {
+		return fmt.Errorf("read mode: %w", readErr)
 	}
 
 	var key []byte
@@ -169,29 +169,30 @@ func receiveFiles(relayAddr, code, outputDir, password, keyStr string) error {
 	} else {
 		// Key mode
 		if keyStr != "" {
-			key, err = crypto.KeyFromString(keyStr)
-			if err != nil {
-				return fmt.Errorf("invalid key: %w", err)
+			var keyErr error
+			key, keyErr = crypto.KeyFromString(keyStr)
+			if keyErr != nil {
+				return fmt.Errorf("invalid key: %w", keyErr)
 			}
 		} else {
 			key = make([]byte, crypto.KeySize)
-			if _, err := io.ReadFull(conn, key); err != nil {
-				return fmt.Errorf("read key: %w", err)
+			if _, readKeyErr := io.ReadFull(conn, key); readKeyErr != nil {
+				return fmt.Errorf("read key: %w", readKeyErr)
 			}
 		}
 	}
 
 	// Create output directory
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
-		return fmt.Errorf("create output dir: %w", err)
+	if mkdirErr := os.MkdirAll(outputDir, 0755); mkdirErr != nil {
+		return fmt.Errorf("create output dir: %w", mkdirErr)
 	}
 
 	receiver := transfer.NewReceiver(conn, key, outputDir)
 
 	// Получаем метаданные для настройки graceful shutdown
-	meta, err := receiver.ReceiveMetadata()
-	if err != nil {
-		return fmt.Errorf("receive metadata: %w", err)
+	meta, metaErr := receiver.ReceiveMetadata()
+	if metaErr != nil {
+		return fmt.Errorf("receive metadata: %w", metaErr)
 	}
 
 	// Настраиваем graceful shutdown ПЕРЕД началом скачивания

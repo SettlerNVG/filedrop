@@ -165,9 +165,10 @@ func (r *Receiver) receiveFile(path string, info FileInfo, meta *TransferMetadat
 
 	var encReader *crypto.EncryptedReader
 	if r.key != nil {
-		encReader, err = crypto.NewEncryptedReader(r.conn, r.key)
-		if err != nil {
-			return err
+		var encErr error
+		encReader, encErr = crypto.NewEncryptedReader(r.conn, r.key)
+		if encErr != nil {
+			return encErr
 		}
 	}
 

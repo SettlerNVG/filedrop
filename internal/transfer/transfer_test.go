@@ -93,15 +93,14 @@ func TestReceiver_SaveProgress(t *testing.T) {
 	}
 
 	// Check file content
-	data, err := os.ReadFile(progressFile)
-	if err != nil {
-		t.Fatalf("Failed to read progress file: %v", err)
+	data, readErr := os.ReadFile(progressFile)
+	if readErr != nil {
+		t.Fatalf("Failed to read progress file: %v", readErr)
 	}
 
 	var info ResumeInfo
-	err = json.Unmarshal(data, &info)
-	if err != nil {
-		t.Fatalf("Failed to parse progress file: %v", err)
+	if unmarshalErr := json.Unmarshal(data, &info); unmarshalErr != nil {
+		t.Fatalf("Failed to parse progress file: %v", unmarshalErr)
 	}
 
 	if info.CurrentFile != 1 {
