@@ -1,4 +1,4 @@
-name: "CodeQL"
+name: CodeQL
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [ main ]
   schedule:
-    - cron: '0 6 * * 1'  # Weekly on Monday at 6 AM UTC
+    - cron: '0 6 * * 1'
 
 jobs:
   analyze:
@@ -17,19 +17,13 @@ jobs:
       contents: read
       security-events: write
 
-    strategy:
-      fail-fast: false
-      matrix:
-        language: [ 'go' ]
-
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@v4
+      uses: github/codeql-action/init@v3
       with:
-        languages: ${{ matrix.language }}
+        languages: go
 
     - name: Set up Go
       uses: actions/setup-go@v5
@@ -40,4 +34,4 @@ jobs:
       run: make build
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v4
+      uses: github/codeql-action/analyze@v3

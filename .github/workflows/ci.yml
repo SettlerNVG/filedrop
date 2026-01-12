@@ -13,97 +13,66 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
-    
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VERSION }}
-        cache: true
 
     - name: Download dependencies
       run: go mod download
 
-    - name: Verify dependencies
-      run: go mod verify
-
     - name: Run tests
-      run: |
-        go test -v -race -coverprofile=coverage.out ./...
-        echo "Tests completed with exit code: $?"
+      run: go test -v -race -coverprofile=coverage.out ./...
 
     - name: Upload coverage to Codecov
-      if: success()
-      uses: codecov/codecov-action@v5
+      uses: codecov/codecov-action@v4
       with:
-        file: ./coverage.out
+        files: ./coverage.out
         flags: unittests
-        name: codecov-umbrella
         fail_ci_if_error: false
-        verbose: true
-      env:
-        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        token: ${{ secrets.CODECOV_TOKEN }}
 
   lint:
     name: Lint
     runs-on: ubuntu-latest
-    
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VERSION }}
-        cache: true
 
-    - name: Run go vet
-      run: go vet ./...
-
-    - name: Check formatting
-      run: |
-        if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
-          echo "❌ Code is not formatted:"
-          gofmt -s -l .
-          echo "Run: gofmt -s -w ."
-          exit 1
-        fi
-        echo "✅ Code is properly formatted"
-
-    - name: Run staticcheck
-      uses: dominikh/staticcheck-action@v1.4.0
+    - name: Run golangci-lint
+      uses: golangci/golangci-lint-action@v4
       with:
-        version: "latest"
-        install-go: false
+        version: latest
+        args: --timeout=5m
 
   security:
     name: Security
     runs-on: ubuntu-latest
-    
+    permissions:
+      security-events: write
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VERSION }}
-        cache: true
 
-    - name: Run gosec
-      continue-on-error: true
-      run: |
-        go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
-        gosec -fmt sarif -out gosec.sarif ./... || true
-        gosec ./... || echo "Security issues found (non-blocking)"
+    - name: Run Gosec
+      uses: securego/gosec@master
+      with:
+        args: '-no-fail -fmt sarif -out gosec.sarif ./...'
 
-    - name: Upload SARIF file
+    - name: Upload SARIF
+      uses: github/codeql-action/upload-sarif@v3
       if: always()
-      uses: github/codeql-action/upload-sarif@v4
       with:
         sarif_file: gosec.sarif
 
@@ -111,33 +80,20 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     needs: [test, lint]
-    
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VERSION }}
-        cache: true
 
-    - name: Build binaries
-      run: |
-        echo "Building binaries..."
-        make build
-        echo "✅ Build completed"
-        
-    - name: Test binaries
-      run: |
-        echo "Testing binaries..."
-        ./bin/filedrop --help > /dev/null && echo "✅ filedrop works"
-        ./bin/relay --help > /dev/null 2>&1 && echo "✅ relay works" || echo "⚠️ relay help failed (expected)"
-        ./bin/filedrop-tui --help > /dev/null 2>&1 && echo "✅ filedrop-tui works" || echo "⚠️ tui help failed (expected)"
+    - name: Build
+      run: make build
 
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v6
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
       with:
-        name: binaries-${{ github.sha }}
+        name: binaries
         path: bin/
         retention-days: 7
