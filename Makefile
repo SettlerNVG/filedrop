@@ -23,6 +23,10 @@ run-tui:
 run-relay:
 	go run ./cmd/relay -port 9000
 
+# Run relay with ngrok (public access)
+run-relay-public:
+	./scripts/run-ngrok-relay.sh
+
 # Docker commands
 docker-build:
 	docker-compose build

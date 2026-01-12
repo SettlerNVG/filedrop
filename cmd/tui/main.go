@@ -679,24 +679,28 @@ func main() {
 
 	relay := *relayAddr
 	
-	// Try to connect, fallback to localhost if public IP fails
-	conn, err := net.DialTimeout("tcp", relay, 3*time.Second)
+	fmt.Printf("🔍 Connecting to relay: %s\n", relay)
+	
+	// Try to connect, fallback to localhost if fails
+	conn, err := net.DialTimeout("tcp", relay, 5*time.Second)
 	if err != nil {
-		// Try localhost as fallback (for local relay)
+		// Try localhost as fallback
 		localRelay := "localhost:9000"
+		fmt.Printf("⚠️  Cannot reach %s, trying localhost...\n", relay)
 		conn, err = net.DialTimeout("tcp", localRelay, 2*time.Second)
 		if err != nil {
-			fmt.Printf("❌ Cannot connect to relay at %s\n\n", relay)
+			fmt.Printf("❌ Cannot connect to relay\n\n")
 			fmt.Println("Options:")
-			fmt.Println("  1. Start relay:        make run-relay")
-			fmt.Println("  2. Connect to remote:  filedrop-tui -relay <ip>:9000")
+			fmt.Println("  1. Wait for public relay to come online")
+			fmt.Println("  2. Run your own: make run-relay")
+			fmt.Println("  3. Specify relay: filedrop-tui -relay <address>")
 			os.Exit(1)
 		}
 		relay = localRelay
-		fmt.Printf("📡 Connected to local relay: %s\n", relay)
-		time.Sleep(500 * time.Millisecond)
 	}
 	conn.Close()
+	fmt.Printf("✅ Connected!\n")
+	time.Sleep(300 * time.Millisecond)
 
 	p := tea.NewProgram(initialModel(relay, *username), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {

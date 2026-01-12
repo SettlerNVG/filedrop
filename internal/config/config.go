@@ -1,13 +1,19 @@
 package config
 
 import (
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
-// DefaultRelay is the public relay server
-var DefaultRelay = "5.18.196.229:9000"
+// RelayAddressURL is the URL to fetch current relay address
+const RelayAddressURL = "https://raw.githubusercontent.com/SettlerNVG/filedrop/main/relay-address.txt"
+
+// FallbackRelay is used if remote fetch fails
+const FallbackRelay = "localhost:9000"
 
 // GetDefaultRelay returns the default relay address
 func GetDefaultRelay() string {
@@ -16,7 +22,7 @@ func GetDefaultRelay() string {
 		return relay
 	}
 
-	// 2. Check config file
+	// 2. Check local config file
 	home, err := os.UserHomeDir()
 	if err == nil {
 		configPath := filepath.Join(home, ".filedrop", "relay")
@@ -28,8 +34,40 @@ func GetDefaultRelay() string {
 		}
 	}
 
-	// 3. Use default
-	return DefaultRelay
+	// 3. Fetch from remote
+	relay := fetchRemoteRelay()
+	if relay != "" {
+		return relay
+	}
+
+	// 4. Fallback
+	return FallbackRelay
+}
+
+// fetchRemoteRelay gets current relay address from GitHub
+func fetchRemoteRelay() string {
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get(RelayAddressURL)
+	if err != nil {
+		return ""
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return ""
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return ""
+	}
+
+	relay := strings.TrimSpace(string(body))
+	if relay == "" || relay == "localhost:9000" {
+		return "" // Not configured yet
+	}
+
+	return relay
 }
 
 // SaveRelay saves relay address to config file
