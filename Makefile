@@ -29,16 +29,30 @@ run-relay-public:
 
 # Docker commands
 docker-build:
-	docker-compose build
+	docker compose build
 
 docker-up:
-	docker-compose up -d
+	docker compose up -d relay
 
 docker-down:
-	docker-compose down
+	docker compose down
 
 docker-logs:
-	docker-compose logs -f relay
+	docker compose logs -f relay
+
+docker-restart:
+	docker compose restart relay
+
+docker-shell:
+	docker compose exec relay sh
+
+# Docker with ngrok (public access)
+docker-public:
+	docker compose --profile public up -d
+	@echo "🌐 ngrok UI: http://localhost:4040"
+
+docker-public-down:
+	docker compose --profile public down
 
 # Cross-compile for different OS
 build-all:
