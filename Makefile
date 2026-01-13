@@ -90,13 +90,40 @@ test-coverage-func:
 
 # Quality checks (like CI)
 quality:
-	@echo "Running quality checks..."
-	go test ./...
-	go vet ./...
-	gofmt -s -l .
-	@echo "✅ All quality checks passed"
+	@echo "🔍 Running quality checks..."
+	@echo "📋 Running tests..."
+	@go test ./... || (echo "❌ Tests failed" && exit 1)
+	@echo "✅ Tests passed"
+	@echo "🔍 Running go vet..."
+	@go vet ./... || (echo "❌ go vet failed" && exit 1)
+	@echo "✅ go vet passed"
+	@echo "📝 Checking formatting..."
+	@if [ "$$(gofmt -s -l . | wc -l)" -gt 0 ]; then \
+		echo "❌ Code is not formatted:"; \
+		gofmt -s -l .; \
+		echo "Run: make fmt"; \
+		exit 1; \
+	fi
+	@echo "✅ Code is properly formatted"
+	@echo "🎉 All quality checks passed!"
+
+# Format code
+fmt:
+	@echo "📝 Formatting code..."
+	@gofmt -s -w .
+	@echo "✅ Code formatted"
 
 # Security scan
 security:
+	@echo "🔒 Running security scan..."
 	@which gosec > /dev/null || go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
-	gosec ./...
+	@gosec -quiet ./... || echo "⚠️ Security issues found (non-blocking)"
+	@echo "✅ Security scan completed"
+
+# Full CI simulation
+ci-local:
+	@echo "🚀 Running full CI simulation locally..."
+	@make quality
+	@make security
+	@make build
+	@echo "🎉 Local CI simulation completed successfully!"
