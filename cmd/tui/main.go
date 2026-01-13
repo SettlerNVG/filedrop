@@ -171,7 +171,6 @@ func (m model) Init() tea.Cmd {
 	)
 }
 
-
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -362,7 +361,6 @@ func (m model) updateTransfer(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Just show progress
 	return m, nil
 }
-
 
 func (m model) View() string {
 	var s strings.Builder
@@ -560,7 +558,6 @@ func tickCmd() tea.Cmd {
 	})
 }
 
-
 func (m model) startTransfer() tea.Cmd {
 	return func() tea.Msg {
 		conn, err := net.DialTimeout("tcp", m.relayAddr, 10*time.Second)
@@ -678,9 +675,9 @@ func main() {
 	flag.Parse()
 
 	relay := *relayAddr
-	
+
 	fmt.Printf("🔍 Connecting to relay: %s\n", relay)
-	
+
 	// Try to connect, fallback to localhost if fails
 	conn, err := net.DialTimeout("tcp", relay, 5*time.Second)
 	if err != nil {

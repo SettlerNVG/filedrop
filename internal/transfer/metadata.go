@@ -20,14 +20,14 @@ type FileInfo struct {
 
 // TransferMetadata contains all transfer info
 type TransferMetadata struct {
-	Files       []FileInfo `json:"files"`
-	TotalSize   int64      `json:"total_size"`
-	TotalFiles  int        `json:"total_files"`
-	Compressed  bool       `json:"compressed"`
-	Encrypted   bool       `json:"encrypted"`
-	TransferID  string     `json:"transfer_id"`
-	ChunkSize   int        `json:"chunk_size"`
-	Resumable   bool       `json:"resumable"`
+	Files      []FileInfo `json:"files"`
+	TotalSize  int64      `json:"total_size"`
+	TotalFiles int        `json:"total_files"`
+	Compressed bool       `json:"compressed"`
+	Encrypted  bool       `json:"encrypted"`
+	TransferID string     `json:"transfer_id"`
+	ChunkSize  int        `json:"chunk_size"`
+	Resumable  bool       `json:"resumable"`
 }
 
 // WriteMetadata sends metadata over connection

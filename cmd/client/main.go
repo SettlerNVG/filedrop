@@ -187,7 +187,7 @@ func receiveFiles(relayAddr, code, outputDir, password, keyStr string) error {
 	}
 
 	receiver := transfer.NewReceiver(conn, key, outputDir)
-	
+
 	// Получаем метаданные для настройки graceful shutdown
 	meta, err := receiver.ReceiveMetadata()
 	if err != nil {

@@ -19,13 +19,13 @@ import (
 
 // Receiver handles file receiving
 type Receiver struct {
-	conn          io.ReadWriter
-	key           []byte
-	outputDir     string
-	currentFile   int
-	bytesWritten  int64
-	mu            sync.Mutex
-	shutdown      chan struct{}
+	conn         io.ReadWriter
+	key          []byte
+	outputDir    string
+	currentFile  int
+	bytesWritten int64
+	mu           sync.Mutex
+	shutdown     chan struct{}
 }
 
 // NewReceiver creates new receiver
@@ -133,12 +133,12 @@ func (r *Receiver) ReceiveFilesWithMetadata(meta *TransferMetadata) error {
 			r.saveProgress(meta, i, resumeFrom)
 			return fmt.Errorf("receive %s: %w", fi.Path, err)
 		}
-		
+
 		// После успешного завершения файла сбрасываем прогресс
 		r.mu.Lock()
 		r.bytesWritten = 0
 		r.mu.Unlock()
-		
+
 		resumeFrom = 0
 	}
 

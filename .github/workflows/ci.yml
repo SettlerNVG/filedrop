@@ -60,9 +60,9 @@ jobs:
         version: "2023.1.6"
 
     - name: Run gosec (Security Scanner)
-      uses: securecodewarrior/github-action-gosec@master
-      with:
-        args: './...'
+      run: |
+        go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+        gosec ./...
 
   build:
     needs: test
